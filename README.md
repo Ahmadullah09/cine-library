@@ -3,28 +3,50 @@
 Cine Diary
 A minimal personal movie/series/anime diary.
 
-Run it from this folder: 
+Part 1: Run the site
+Put index.html and README.md in one folder, for example Documents/cine-diary.
+Open a terminal in that folder.
+Windows: open the folder in File Explorer, click the address bar, type cmd and press Enter.
+Mac: right-click the folder and choose “New Terminal at Folder”.
+Run python3 -m http.server 8080. On Windows, use python -m http.server 8080 if python3 isn’t found. If you don’t have Python, install it from python.org, or run npx serve -l 8080 if you have Node.
+Open http://localhost:8080 in your browser.
+Leave the terminal window open while you use the site. Closing it stops the server, and you start it again the same way next time.
 
-python3 -m http.server 8080
+Always use the same port (8080). Your browser stores data per address, so a different port looks like an empty diary until Drive sync restores it.
 
-Open http://localhost:8080 (don't double-click the file — Google sign-in won't work from `file://`).
+Part 2: Get an OMDb key
+Go to omdbapi.com/apikey.aspx.
+Choose the FREE plan (1,000 requests a day), enter your email and a short reason, and submit.
+Open the email from OMDb and click the activation link. The key doesn’t work until you do.
+In Cine Diary, click Settings, paste the key into “OMDb API key” and click Save.
+Click + Add, search any title and check that results appear. If you see “Invalid API key!”, the key isn’t activated yet.
 
-1. OMDb key
-Get a free key at https://www.omdbapi.com/apikey.aspx (they email it to you), then paste it in Settings.
+At this point the site works fully and saves in your browser. Parts 3 and 4 add the Drive sync.
 
-2. Google Drive sync (one-time setup)
-Go to https://console.cloud.google.com and create a project.
-APIs & Services → Library → enable Google Drive API.
-OAuth consent screen → External, add yourself as a test user.
-Credentials → Create credentials → OAuth client ID → Web application.
-Under Authorised JavaScript origins, add `http://localhost:8080`.
-Copy the Client ID into Settings → Google OAuth Client ID, then press Save & connect Drive.
-Every change is saved to `cine-diary.json` in your Drive (a few seconds after you edit). The app only has access to files it created (`drive.file` scope). The pill in the header shows sync status; click it to sync manually or reconnect (Google tokens last about an hour).
+Part 3: Create the Google client ID
+Go to console.cloud.google.com and sign in with the Google account whose Drive you want to use.
+Click the project dropdown at the top, then New Project. Name it “Cine Diary” and click Create, then make sure it is selected.
+Open the menu, then APIs & Services → Library. Search for Google Drive API, open it and click Enable.
+Open APIs & Services → OAuth consent screen. Google may call this “Google Auth Platform” and show a Get started button.
+App name: Cine Diary. Support email: your email.
+Audience: External.
+Contact email: your email. Accept the terms and click Create.
+Under Audience (or Test users), click Add users and add your own Gmail address. Leave the app in Testing mode. You never need to publish it, but only listed test users can sign in.
+Open Credentials (or Clients) and click Create credentials → OAuth client ID.
+Application type: Web application. Name: Cine Diary.
+Under Authorised JavaScript origins, click Add URI and enter exactly http://localhost:8080. Don’t add a trailing slash.
+Leave “Authorised redirect URIs” empty.
+Click Create.
+Copy the Client ID. It looks like 123456-abcdef.apps.googleusercontent.com. You don’t need the client secret.
 
-Data is also cached in the browser, so the site still works offline and merges with Drive when it reconnects (newest edit per title wins).
+Part 4: Connect Drive
+In Cine Diary, open Settings and paste the Client ID into “Google OAuth Client ID”.
+Click Save & connect Drive.
+A Google popup opens. If your browser blocks it, allow popups for localhost and try again.
+Choose your account. You’ll see “Google hasn’t verified this app”. This is normal because it’s your own app. Click Advanced, then Go to Cine Diary (unsafe).
+Tick the permission to see and manage the files the app creates, then click Continue. The app can’t see any of your other Drive files.
+The pill in the header should change to “Syncing…” and then “Saved to Drive”.
+Check by opening drive.google.com. A file called cine-diary.json should be in My Drive.
 
-Using it
-+ Add → pick a category (Movies/TV Series/Anime Movies/Anime Series), search, add to Watchlist or Watched. OMDb has no "anime" type, so you choose the category yourself.
-Mark as watched on any watchlist card.
-Click a card for details, original ratings (IMDb, Rotten Tomatoes, Metacritic) and your own 0–10 ratings for plot, cast, world-building, soundtrack, cinematography and impact. The average is shown out of 10.
-Settings also have JSON export/import for backups.
+After that, every change you make saves to Drive a couple of seconds later.
+
