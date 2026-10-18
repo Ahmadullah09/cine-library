@@ -204,13 +204,35 @@ let items    = load('cd_items', []);
 let ui       = load('cd_ui', { status: 'watchlist', cat: 'movie', sort: 'added' });
 ui.q = '';
 
+const el = {
+  syncPill: $('#syncPill'),
+  addBtn: $('#addBtn'),
+  setBtn: $('#setBtn'),
+  statusTabs: $('#statusTabs'),
+  catTabs: $('#catTabs'),
+  filter: $('#filter'),
+  sort: $('#sort'),
+  grid: $('#grid'),
+  empty: $('#empty'),
+  modal: $('#modal'),
+  panel: $('#panel'),
+  toast: $('#toast')
+};
+const SYNC_LABELS = {
+  off: 'Drive: off',
+  saving: 'Syncing…',
+  synced: 'Saved to Drive',
+  error: 'Sync failed',
+  reconnect: 'Reconnect Drive'
+};
+
 function avg(r) {
   const v = ASPECTS.map(([k]) => r && r[k]).filter(x => typeof x === 'number');
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2400);
+  el.toast.textContent = msg; el.toast.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => el.toast.classList.remove('show'), 2400);
 }
 function poster(it) {
   const p = it.poster || (it.omdb && it.omdb.Poster);
@@ -232,10 +254,8 @@ let tokenClient = null, accessToken = null, tokenExp = 0, pending = null, fileId
 const driveOn = () => !!(settings.clientId && localStorage.getItem('cd_drive') === '1');
 
 function setSync(s) {
-  const pill = $('#syncPill'); pill.dataset.s = s;
-  pill.querySelector('span').textContent = {
-    off: 'Drive: off', saving: 'Syncing…', synced: 'Saved to Drive', error: 'Sync failed', reconnect: 'Reconnect Drive'
-  }[s];
+  el.syncPill.dataset.s = s;
+  el.syncPill.querySelector('span').textContent = SYNC_LABELS[s];
 }
 function initGoogle() {
   if (tokenClient) return true;
@@ -320,8 +340,8 @@ function disconnectDrive() {
   if (accessToken && window.google) try { google.accounts.oauth2.revoke(accessToken); } catch {}
   accessToken = null; fileId = null; localStorage.removeItem('cd_drive'); setSync('off'); toast('Drive disconnected');
 }
-$('#syncPill').onclick = () => {
-  const s = $('#syncPill').dataset.s;
+el.syncPill.onclick = () => {
+  const s = el.syncPill.dataset.s;
   if (!driveOn()) return openSettings();
   if (s === 'reconnect' || s === 'error') return connectDrive();
   pull().then(() => toast('Synced'));
@@ -337,26 +357,31 @@ async function omdb(params) {
 /* ───────── main render ───────── */
 function render() {
   const live = items.filter(i => !i.deleted);
-  $('#statusTabs').innerHTML = ['watchlist', 'watched'].map(s =>
-    `<button class="${ui.status === s ? 'on' : ''}" data-status="${s}">${s === 'watchlist' ? 'Watchlist' : 'Watched'}<sup>${live.filter(i => i.status === s).length}</sup></button>`).join('');
-  $('#catTabs').innerHTML = CATS.map(([k, l]) =>
-    `<button class="${ui.cat === k ? 'on' : ''}" data-cat="${k}">${l}<sup>${live.filter(i => i.status === ui.status && i.category === k).length}</sup></button>`).join('');
-  $('#sort').value = ui.sort;
+  const statusCount = {
+    watchlist: live.filter(i => i.status === 'watchlist').length,
+    watched: live.filter(i => i.status === 'watched').length
+  };
+  const catCount = Object.fromEntries(CATS.map(([k]) => [k, live.filter(i => i.status === ui.status && i.category === k).length]));
+
+  el.statusTabs.innerHTML = ['watchlist', 'watched'].map(s =>
+    `<button class="${ui.status === s ? 'on' : ''}" data-status="${s}">${s === 'watchlist' ? 'Watchlist' : 'Watched'}<sup>${statusCount[s]}</sup></button>`).join('');
+  el.catTabs.innerHTML = CATS.map(([k, l]) =>
+    `<button class="${ui.cat === k ? 'on' : ''}" data-cat="${k}">${l}<sup>${catCount[k]}</sup></button>`).join('');
+  el.sort.value = ui.sort;
 
   const q = ui.q.trim().toLowerCase();
   let list = live.filter(i => i.status === ui.status && i.category === ui.cat && (!q || i.title.toLowerCase().includes(q)));
-  const yr = i => parseInt(i.year) || 0, imdb = i => parseFloat(i.omdb && i.omdb.imdbRating) || 0;
   const sorts = {
     added:   (a, b) => b.addedAt - a.addedAt,
     watched: (a, b) => (b.watchedAt || 0) - (a.watchedAt || 0),
     title:   (a, b) => a.title.localeCompare(b.title),
-    year:    (a, b) => yr(b) - yr(a),
+    year:    (a, b) => (parseInt(b.year) || 0) - (parseInt(a.year) || 0),
     mine:    (a, b) => (avg(b.ratings) ?? -1) - (avg(a.ratings) ?? -1),
-    imdb:    (a, b) => imdb(b) - imdb(a)
+    imdb:    (a, b) => (parseFloat(b.omdb && b.omdb.imdbRating) || 0) - (parseFloat(a.omdb && a.omdb.imdbRating) || 0)
   };
   list.sort(sorts[ui.sort] || sorts.added);
 
-  $('#grid').innerHTML = list.map(it => {
+  el.grid.innerHTML = list.map(it => {
     const mine = avg(it.ratings), im = real(it.omdb && it.omdb.imdbRating) ? it.omdb.imdbRating : null;
     const sub = ui.status === 'watched'
       ? `${esc(it.year)} · ${mine != null ? 'Mine ' + mine.toFixed(1) : 'Unrated'}${im ? ' · IMDb ' + esc(im) : ''}`
@@ -368,17 +393,16 @@ function render() {
     </article>`;
   }).join('');
 
-  const empty = $('#empty');
-  empty.hidden = list.length > 0;
-  if (!list.length) empty.textContent = q ? 'Nothing matches.' : `No ${catLabel(ui.cat).toLowerCase()} in your ${ui.status} yet.`;
+  el.empty.hidden = list.length > 0;
+  if (!list.length) el.empty.textContent = q ? 'Nothing matches.' : `No ${catLabel(ui.cat).toLowerCase()} in your ${ui.status} yet.`;
   store('cd_ui', { status: ui.status, cat: ui.cat, sort: ui.sort });
 }
 
-$('#statusTabs').onclick = e => { const b = e.target.closest('[data-status]'); if (b) { ui.status = b.dataset.status; render(); } };
-$('#catTabs').onclick    = e => { const b = e.target.closest('[data-cat]');    if (b) { ui.cat = b.dataset.cat; render(); } };
-$('#filter').oninput = e => { ui.q = e.target.value; render(); };
-$('#sort').onchange  = e => { ui.sort = e.target.value; render(); };
-$('#grid').onclick = e => {
+el.statusTabs.onclick = e => { const b = e.target.closest('[data-status]'); if (b) { ui.status = b.dataset.status; render(); } };
+el.catTabs.onclick    = e => { const b = e.target.closest('[data-cat]');    if (b) { ui.cat = b.dataset.cat; render(); } };
+el.filter.oninput = e => { ui.q = e.target.value; render(); };
+el.sort.onchange  = e => { ui.sort = e.target.value; render(); };
+el.grid.onclick = e => {
   const w = e.target.closest('[data-watch]');
   if (w) { setWatched(w.dataset.watch, true); toast('Marked as watched'); return; }
   const c = e.target.closest('.card'); if (c) openDetail(c.dataset.id);
@@ -391,16 +415,15 @@ function setWatched(id, on) {
 }
 
 /* ───────── modal plumbing ───────── */
-const modal = $('#modal'), panel = $('#panel');
 function openModal(html, narrow) {
-  panel.className = 'panel' + (narrow ? ' narrow' : '');
-  panel.innerHTML = `<button class="x" data-close aria-label="Close">×</button>` + html;
-  modal.hidden = false; modal.scrollTop = 0; document.body.style.overflow = 'hidden';
+  el.panel.className = 'panel' + (narrow ? ' narrow' : '');
+  el.panel.innerHTML = `<button class="x" data-close aria-label="Close">×</button>` + html;
+  el.modal.hidden = false; el.modal.scrollTop = 0; document.body.style.overflow = 'hidden';
 }
-function closeModal() { modal.hidden = true; panel.innerHTML = ''; document.body.style.overflow = ''; render(); }
-modal.addEventListener('mousedown', e => { if (e.target === modal) closeModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
-panel.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeModal(); });
+function closeModal() { el.modal.hidden = true; el.panel.innerHTML = ''; document.body.style.overflow = ''; render(); }
+el.modal.addEventListener('mousedown', e => { if (e.target === el.modal) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !el.modal.hidden) closeModal(); });
+el.panel.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeModal(); });
 
 /* ───────── detail view ───────── */
 function openDetail(id) {
@@ -442,7 +465,7 @@ function openDetail(id) {
     </div>
   </div>`);
 
-  panel.querySelectorAll('input[type=range]').forEach(inp => inp.oninput = () => {
+  el.panel.querySelectorAll('input[type=range]').forEach(inp => inp.oninput = () => {
     const k = inp.dataset.k; it.ratings = it.ratings || {}; it.ratings[k] = parseFloat(inp.value);
     inp.classList.remove('unset'); inp.nextElementSibling.textContent = inp.value;
     const n = avg(it.ratings); $('#avg').textContent = n == null ? '–' : n.toFixed(1);
@@ -466,7 +489,7 @@ function openAdd() {
     <div id="results"></div>`);
   $('#aq').focus();
   $('#addCats').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; add.cat = b.dataset.c;
-    panel.querySelectorAll('#addCats button').forEach(x => x.classList.toggle('on', x === b));
+    el.panel.querySelectorAll('#addCats button').forEach(x => x.classList.toggle('on', x === b));
     if ($('#aq').value.trim()) runSearch(false); };
   $('#sform').onsubmit = e => { e.preventDefault(); runSearch(false); };
   $('#results').onclick = onResultClick;
@@ -510,7 +533,7 @@ async function onResultClick(e) {
     persist(); render(); renderResults(); toast(`Added to ${b.dataset.st === 'watched' ? 'Watched' : 'Watchlist'}`);
   } catch (err) { toast('Could not add: ' + (err.message || 'error')); renderResults(); }
 }
-$('#addBtn').onclick = openAdd;
+el.addBtn.onclick = openAdd;
 
 /* ───────── settings ───────── */
 function openSettings() {
@@ -551,7 +574,7 @@ function openSettings() {
     catch { toast('Invalid file'); }
   };
 }
-$('#setBtn').onclick = openSettings;
+el.setBtn.onclick = openSettings;
 
 /* ───────── boot ───────── */
 render();
